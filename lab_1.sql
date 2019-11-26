@@ -1,6 +1,8 @@
 -- Setup the database
+--DROP DATABASE lab1;
 CREATE database lab1;
 USE lab1;
+--USE master;
 
 
 ---- Create the tables
@@ -67,6 +69,8 @@ INSERT INTO dog_house VALUES (4, 'metal');
 INSERT INTO dog_house VALUES (5, 'metal');
 INSERT INTO dog_house VALUES (6, 'diamonds');
 INSERT INTO dog_house VALUES (7, 'platinum');
+INSERT INTO dog_house VALUES (8, 'red diamonds');
+INSERT INTO dog_house VALUES (9, 'blue diamonds');
 
 INSERT INTO house VALUES ('house 1');
 INSERT INTO house VALUES ('house 2');
@@ -104,10 +108,279 @@ INSERT INTO street VALUES ('null street', NULL);
 INSERT INTO street (name) VALUES ('clean code street');
 INSERT INTO street (name, len) VALUES ('cool street', 10);
 
--- Utilities
+-- Updates
+UPDATE dog_house SET material = 'precious metal' WHERE pk_house_id IN (6, 7);
+UPDATE dog_house SET material = 'very precious metal' WHERE pk_house_id IS NULL;
+UPDATE dog_house SET material = 'diamonds' WHERE material LIKE '%diamonds';
 
-SELECT * FROM dog_vs_cat;
+UPDATE dog SET birthday='2010-09-09' WHERE fk_dog_house BETWEEN 4 AND 7;
+
+UPDATE cat SET name = 'Horatiu' WHERE pk_cat_id = 'house 10'; -- this query does not match any cat! 
+
+-- Deletes
+DELETE FROM dog WHERE fk_house IS NULL;
+
+-- Selecting stuff
+SELECT name FROM cat 
+UNION
+SELECT name FROM dog; -- all pet names ids 
+
+SELECT dog_id FROM dog_vs_cat 
+UNION
+SELECT pk_dog_id FROM dog; -- all dog ids 
+
+SELECT dog_id FROM dog_vs_cat 
+INTERSECT
+SELECT pk_dog_id FROM dog; -- dogs that have a relation to cats
+
+SELECT dog_id FROM dog_vs_cat 
+EXCEPT
+SELECT pk_dog_id FROM dog; -- dogs that do NOT have a relation to cats
+
+-- Joined stuff
+SELECT d.name, c.name
+FROM
+	dog d
+	INNER JOIN dog_vs_cat dc ON d.pk_dog_id = dc.dog_id
+	INNER JOIN cat c ON c.pk_cat_id = dc.cat_id;
+	
+
+SELECT dog.name, dog_vs_cat.cat_id
+FROM (dog
+LEFT JOIN dog_vs_cat ON dog.pk_dog_id = dog_vs_cat.dog_id)
+ORDER BY dog.name;
+
+SELECT cat.name, dog_vs_cat.cat_id
+FROM (dog_vs_cat
+RIGHT JOIN cat ON cat.pk_cat_id = dog_vs_cat.cat_id)
+ORDER BY cat.name;
+
+SELECT TOP 10 d.name, c.name
+FROM dog d
+	FULL JOIN dog_vs_cat dc ON d.pk_dog_id = dc.dog_id
+	FULL JOIN cat c ON c.pk_cat_id = dc.cat_id;
+ORDER BY d.name;
+
+
+-- Subqueries
+SELECT name
+FROM dog
+WHERE pk_dog_id IN (SELECT dog_id FROM dog_vs_cat);
+
+SELECT name
+FROM dog
+WHERE pk_dog_id NOT IN (SELECT dog_id FROM dog_vs_cat);
+
+SELECT DISTINCT name
+FROM cat
+WHERE EXISTS (SELECT cat_id FROM dog_vs_cat WHERE cat.pk_cat_id = dog_vs_cat.cat_id);
+
+SELECT DISTINCT name
+FROM cat
+WHERE NOT EXISTS (SELECT cat_id FROM dog_vs_cat WHERE cat.pk_cat_id = dog_vs_cat.cat_id);
+
+-- Subquery in FROM clause
+
+SELECT custom_table_name.name
+FROM (
+	SELECT * FROM dog WHERE pk_dog_id IN (
+		SELECT dog_id FROM dog_vs_cat
+	)
+) AS custom_table_name;
+
+
+-- Group by stuff
+
+SELECT 
+    d.name
+FROM 
+    dog d
+	FULL OUTER JOIN dog_vs_cat dc ON d.pk_dog_id = dc.dog_id 
+	FULL OUTER JOIN cat c ON c.pk_cat_id = dc.cat_id
+GROUP BY d.name;
+
+SELECT c.name, c.pk_cat_id, COUNT(c.name)
+FROM 
+	cat c
+	FULL JOIN dog_vs_cat dc ON c.pk_cat_id = dc.cat_id  
+GROUP BY c.name, c.pk_cat_id
+HAVING c.pk_cat_id > (SELECT MIN(pk_cat_id) FROM cat);
+
+SELECT d.name, d.pk_dog_id, c.name, c.pk_cat_id
+FROM 
+	dog d
+	FULL JOIN dog_vs_cat dc ON d.pk_dog_id = dc.dog_id
+	FULL JOIN cat c ON c.pk_cat_id = dc.cat_id
+GROUP BY d.pk_dog_id, c.name, d.name, c.pk_cat_id
+HAVING d.pk_dog_id < (SELECT AVG(pk_dog_id) FROM dog)
+--GROUP BY d.name
+ORDER BY d.name ASC;
+
+
+-- Lab 3
+
+-- Add column
+CREATE OR ALTER PROCEDURE V1
+AS
+BEGIN
+	ALTER TABLE dbo.dog
+	ADD birthday DATE
+END
+
+EXEC V1;
+
+CREATE OR ALTER PROCEDURE RV1
+AS
+BEGIN
+	ALTER TABLE dbo.dog
+	DROP COLUMN birthday
+END
+
+EXEC RV1;
+
+
+-- Add pk constraint
+CREATE OR ALTER PROCEDURE V2
+AS
+BEGIN
+	ALTER TABLE dbo.street
+	ADD CONSTRAINT name_pk PRIMARY KEY(name)
+END
+
+EXEC V2;
+
+CREATE OR ALTER PROCEDURE RV2
+AS
+BEGIN
+	ALTER TABLE dbo.street
+	DROP CONSTRAINT name_pk
+END
+
+EXEC RV2;
+
+-- -- WTF???
+-- Add fk constraint
+-- WTF:
+--CREATE OR ALTER PROCEDURE V3
+--AS
+--BEGIN
+--	ALTER TABLE dbo.house
+--	ADD fk_house_id VARCHAR(100)
+--	ALTER TABLE dbo.house
+--	ADD CONSTRAINT house_id FOREIGN KEY(fk_house_id) REFERENCES house(pk_house_id)	
+--END
+
+CREATE OR ALTER PROCEDURE V3
+AS
+BEGIN
+	ALTER TABLE dbo.street
+	ADD fk_house_id VARCHAR(100)
+	ALTER TABLE dbo.street
+	ADD CONSTRAINT house_id FOREIGN KEY(fk_house_id) REFERENCES house(pk_house_id)	
+END
+
+ALTER TABLE dbo.street DROP house_id;
+ALTER TABLE dbo.street DROP COLUMN fk_house_id;
+EXEC V3;
+
+CREATE OR ALTER PROCEDURE RV3
+AS
+BEGIN
+	ALTER TABLE dbo.street
+	DROP CONSTRAINT house_id
+	ALTER TABLE dbo.street
+	DROP COLUMN fk_house_id
+END
+
+EXEC RV3;
+
+
+-- Add table
+CREATE OR ALTER PROCEDURE V4
+AS
+BEGIN
+	CREATE TABLE dbo.stray_cat (
+		pk_stray_cat_id INT PRIMARY KEY,
+	)
+END
+
+EXEC V4;
+
+
+CREATE OR ALTER PROCEDURE RV4
+AS
+BEGIN
+	DROP TABLE dbo.stray_cat
+END
+
+EXEC RV4;
+
+
+CREATE TABLE dbo.versions(
+	version_id INT PRIMARY KEY,
+	version_number INT NOT NULL
+)
+
+INSERT INTO dbo.versions VALUES (0, 0)
+
+
+CREATE OR ALTER PROCEDURE main
+	@version INT 
+AS 
+BEGIN
+	DECLARE @version_from INT = (SELECT V.version_number FROM dbo.versions V)
+	DECLARE @executable_procedure VARCHAR(50)
+
+	IF @version <= 4 AND @version >= 0
+	BEGIN
+		IF @version > @version_from -- move backwards in versions
+		BEGIN
+			WHILE @version > @version_from
+			BEGIN
+				SET @version_from = @version_from + 1
+				SET @executable_procedure = 'V' + CAST(@version_from AS VARCHAR(2))
+				EXEC @executable_procedure
+			END
+		END
+
+		ELSE -- move forward in versions
+			WHILE @version < @version_from
+			BEGIN
+				IF @version_from != 0
+				BEGIN
+					SET @executable_procedure = 'RV' + CAST(@version_from AS VARCHAR(2))
+					EXEC @executable_procedure
+				END
+				SET @version_from = @version_from - 1
+			END
+
+		UPDATE versions
+		SET version_number = @version
+	END	
+END;
+
+
+EXEC main 0;
+
+EXEC main 1; -- to check dog table should have birthday
+SELECT column_name, data_type, character_maximum_length, is_nullable 
+FROM information_schema.columns WHERE table_name = 'dog';
+
+EXEC main 2; -- to check street name should be a primary key
+SELECT column_name, data_type, character_maximum_length, is_nullable 
+FROM information_schema.columns WHERE table_name = 'street';
+
+EXEC main 3; -- to check street table should have a foreign key to house
+SELECT column_name, data_type, character_maximum_length, is_nullable 
+FROM information_schema.columns WHERE table_name = 'street';
+
+EXEC main 4; -- to check there should be a stray_cat table
+SELECT column_name, data_type, character_maximum_length, is_nullable 
+FROM information_schema.columns WHERE table_name = 'stray_cat';
+
+SELECT * FROM dbo.versions;
+
 
 ---- To see what I just created
-SELECT column_name, data_type, character_maximum_length, is_nullable 
-FROM information_schema.columns;-- WHERE table_name = 'movies';
+--SELECT column_name, data_type, character_maximum_length, is_nullable 
+--FROM information_schema.columns WHERE table_name = 'movies';
