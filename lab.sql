@@ -260,6 +260,7 @@ EXEC RV2;
 
 -- -- WTF???
 -- Add fk constraint
+
 -- WTF:
 --CREATE OR ALTER PROCEDURE V3
 --AS
@@ -379,6 +380,152 @@ SELECT column_name, data_type, character_maximum_length, is_nullable
 FROM information_schema.columns WHERE table_name = 'stray_cat';
 
 SELECT * FROM dbo.versions;
+
+
+-- Lab 4
+-- Procedures & functions
+
+CREATE OR ALTER FUNCTION checkInt(@n INT)
+RETURNS INT AS
+BEGIN
+	DECLARE @no INT
+		IF @n>0 AND @n<=100
+			SET @no=1
+		ELSE
+			SET @no=0
+		RETURN @no
+	END
+
+
+CREATE OR ALTER FUNCTION checkVarchar(@v VARCHAR(255))
+RETURNS bit AS
+	BEGIN
+		DECLARE @b bit
+		IF LEN(@v) > 5
+			SET @b=1
+		ELSE
+			SET @b=0
+		RETURN @b
+	END
+
+
+CREATE OR ALTER PROCEDURE addPerson @hi VARCHAR(100), @n VARCHAR(255), @e VARCHAR(255)
+AS
+BEGIN
+	-- validate the parameters @hi, @n, @e - at least 2 parameters
+	IF dbo.checkVarchar(@hi)=1 AND dbo.checkVarchar(@n)=1
+	BEGIN
+		INSERT INTO person(name, email, fk_house) VALUES (@n, @e, @hi)
+		PRINT 'Just added a new person!'
+		SELECT * FROM person
+	END
+	ELSE
+		BEGIN
+		PRINT 'the parameters are not correct'
+		SELECT * FROM person
+	END
+END
+	
+SELECT * FROM house
+
+SELECT * FROM person
+
+INSERT INTO house VALUES ('house 9');
+
+EXEC addPerson 'house 9', 'Matei Stefan', 'person@email.com'
+
+EXEC addPerson 'house 8', 'Mihai Viteazul', 'peepeerson@email.com'
+
+print 'hello'
+
+CREATE OR ALTER PROCEDURE addCat @hi VARCHAR(100), @n VARCHAR(255)
+AS
+BEGIN
+	-- validate the parameters @hi, @n
+	IF dbo.checkVarchar(@hi)=1 AND dbo.checkVarchar(@n)=1
+		BEGIN
+			INSERT INTO dbo.cat(name, fk_house) VALUES (@n, @hi)
+			PRINT 'Just added a new cat!'
+			SELECT * FROM cat
+		END
+	ELSE
+		BEGIN
+			PRINT 'the parameters are not correct'
+			SELECT * FROM cat
+		END
+END
+
+EXEC addCat 'house 6', 'Matei Stefan'
+
+EXEC addCat 'house 6', 'Mihai Viteazul'
+
+CREATE OR ALTER VIEW viewAllNames
+AS
+BEGIN
+	SELECT p.name, d.name, c.name, s.name
+	FROM person p FULL JOIN dog d ON p.name = d.name
+			      FULL JOIN cat c ON p.name = c.name
+			      FULL JOIN street s ON p.name = s.name
+END
+
+-- INSERT
+-- create a copy for the table
+CREATE TABLE dbo.cat_copy (
+	pk_cat_id INT IDENTITY(1,1) PRIMARY KEY,
+	name NVARCHAR(100),
+	-- Many cats can stay in one house
+	fk_house VARCHAR(100) FOREIGN KEY REFERENCES house(pk_house_id),
+)
+
+CREATE TABLE dbo.logs(
+	TriggerDate DATE,
+	TriggerType VARCHAR(20),
+	NameAffectedTable VARCHAR(20),
+	NoAMDRows INT
+)
+
+
+
+CREATE OR ALTER TRIGGER log_cat_insert ON cat FOR INSERT AS
+BEGIN
+	INSERT INTO cat_copy(name, fk_house) SELECT name, fk_house FROM inserted
+    INSERT INTO logs(TriggerDate, TriggerType, NameAffectedTable, NoAMDRows) values (GETDATE(), 'INSERT', 'cat', @@ROWCOUNT)
+END
+
+CREATE OR ALTER TRIGGER log_cat_update ON cat FOR INSERT AS
+BEGIN
+	INSERT INTO cat_copy(name, fk_house) SELECT name, fk_house FROM inserted
+    INSERT INTO logs(TriggerDate, TriggerType, NameAffectedTable, NoAMDRows) values (GETDATE(), 'UPDATE', 'cat', @@ROWCOUNT)
+END
+
+CREATE OR ALTER TRIGGER log_cat_update ON dog FOR INSERT AS
+BEGIN
+	INSERT INTO dog_copy(name, fk_house) SELECT name, fk_house FROM inserted
+    INSERT INTO logs(TriggerDate, TriggerType, NameAffectedTable, NoAMDRows) values (GETDATE(), 'UPDATE', 'dog', @@ROWCOUNT)
+END
+
+CREATE OR ALTER TRIGGER log_delete ON dog FOR INSERT AS
+BEGIN
+	INSERT INTO dog_copy(name, fk_house) SELECT name, fk_house FROM inserted
+    INSERT INTO logs(TriggerDate, TriggerType, NameAffectedTable, NoAMDRows) values (GETDATE(), 'delete', 'dog', @@ROWCOUNT)
+END
+
+
+
+SELECT * FROM dbo.cat
+
+SELECT * FROM dbo.cat_copy
+
+INSERT INTO cat (name, fk_house) VALUES ('procedure triggering cat', 'house 6')
+
+SELECT * FROM dbo.cat
+
+SELECT * FROM dbo.cat_copy
+
+SELECT * FROM dbo.logs
+
+DROP TRIGGER log_cat
+
 
 
 ---- To see what I just created
